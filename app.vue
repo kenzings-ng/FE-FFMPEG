@@ -1,7 +1,7 @@
 <template>
-  <NuxtLoadingIndicator />
+  <NuxtLoadingIndicator color="rgb(var(--accent))" />
   <NuxtLayout>
     <NuxtPage />
   </NuxtLayout>
+  <OfflineScreen />
 </template>
-s

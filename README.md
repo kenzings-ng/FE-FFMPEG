@@ -4,6 +4,16 @@ Look at the [Nuxt 3 documentation](https://nuxt.com/docs/getting-started/introdu
 
 ## Setup
 
+Tạo file `.env` (không commit) và đặt domain API (Laravel):
+
+```bash
+cp .env.example .env
+# sửa NUXT_PUBLIC_API_BASE=https://api.example.com
+```
+
+- Dev / `npm run deploy` (pm2): đọc từ `.env`. Đổi giá trị thì `pm2 reload ecosystem.config.cjs --update-env`, không cần build lại.
+- GitHub Pages: đặt biến `NUXT_PUBLIC_API_BASE` ở *Settings → Secrets and variables → Actions → Variables*.
+
 Make sure to install the dependencies:
 
 ```bash

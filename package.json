@@ -1,5 +1,5 @@
 {
-  "name": "nuxt-app",
+  "name": "fe-ffmpeg",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,25 +7,21 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "typecheck": "nuxt typecheck",
+    "postinstall": "nuxt prepare",
+    "deploy": "nuxt build && rm -rf .output-pm2 && cp -a .output .output-pm2 && pm2 reload ecosystem.config.cjs --update-env"
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.22",
     "@heroicons/vue": "^2.1.5",
-    "@nuxtjs/tailwindcss": "^6.12.1",
-    "@tailwindcss/aspect-ratio": "^0.4.2",
-    "flowbite": "^2.4.1",
-    "graphql-tag": "^2.12.6",
-    "graphql-upload": "^16.0.2",
     "hls.js": "^1.5.15",
     "nuxt": "^3.12.3",
     "plyr": "^3.7.8",
-    "vue": "latest"
+    "vue": "^3.4.0"
   },
   "devDependencies": {
-    "@ant-design-vue/nuxt": "^1.4.2",
-    "@nuxtjs/apollo": "^5.0.0-alpha.14",
     "@nuxtjs/color-mode": "^3.4.2",
+    "@nuxtjs/tailwindcss": "^6.12.1",
     "tailwindcss": "^3.4.4"
   }
 }
