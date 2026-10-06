@@ -1,4 +1,8 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+
+// GitHub Pages chạy dưới /<repo>/ (NUXT_APP_BASE_URL); link trong <head> không tự thêm base.
+const baseURL = process.env.NUXT_APP_BASE_URL || '/'
+
 export default defineNuxtConfig({
   compatibilityDate: '2024-09-20',
   devtools: { enabled: true },
@@ -35,6 +39,10 @@ export default defineNuxtConfig({
         { name: 'theme-color', content: '#0a0a0f' },
       ],
       link: [
+        // Favicon khớp AppLogo; .ico cho trình duyệt cũ, apple-touch-icon cho màn hình chính iOS.
+        { rel: 'icon', type: 'image/svg+xml', href: `${baseURL}favicon.svg` },
+        { rel: 'icon', type: 'image/x-icon', href: `${baseURL}favicon.ico`, sizes: '32x32' },
+        { rel: 'apple-touch-icon', href: `${baseURL}apple-touch-icon.png` },
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
         {
