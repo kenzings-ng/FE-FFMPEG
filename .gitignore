@@ -1,5 +1,6 @@
 # Nuxt dev/build outputs
 .output
+.output-pm2
 .data
 .nuxt
 .nitro

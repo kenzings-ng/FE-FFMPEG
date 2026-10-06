@@ -1,3 +1,85 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Token màu dạng "R G B" để dùng được với opacity của Tailwind (bg-accent/20). */
+@layer base {
+  :root {
+    --bg: 248 250 252;
+    --surface: 255 255 255;
+    --surface-2: 241 245 249;
+    --line: 226 232 240;
+    --fg: 15 23 42;
+    --muted: 71 85 105;
+    --accent: 225 29 72;
+    --accent-fg: 255 255 255;
+    --success: 21 128 61;
+    --warning: 180 83 9;
+    --danger: 220 38 38;
+    color-scheme: light;
+  }
+
+  .dark {
+    --bg: 10 10 15;
+    --surface: 20 20 28;
+    --surface-2: 30 30 41;
+    --line: 45 45 60;
+    --fg: 248 250 252;
+    --muted: 148 163 184;
+    --accent: 244 63 94;
+    --accent-fg: 255 255 255;
+    --success: 74 222 128;
+    --warning: 251 191 36;
+    --danger: 248 113 113;
+    color-scheme: dark;
+  }
+
+  html {
+    /* Header sticky cao 4rem: không che phần tử đang focus/anchor. */
+    scroll-padding-top: 5rem;
+  }
+
+  body {
+    @apply bg-bg font-sans text-fg antialiased;
+    touch-action: manipulation;
+  }
+
+  h1,
+  h2 {
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-bg;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-accent-fg hover:bg-accent/90;
+  }
+  .btn-ghost {
+    @apply btn border border-line bg-surface text-fg hover:bg-surface-2;
+  }
+  .input {
+    @apply block min-h-11 w-full rounded-lg border border-line bg-surface px-3 text-base text-fg placeholder:text-muted/70 focus:border-accent;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-fg;
+  }
+  .card {
+    @apply rounded-xl border border-line bg-surface;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
