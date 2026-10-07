@@ -80,7 +80,11 @@
           </div>
 
           <div class="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
-            <span>{{ isOwner ? 'Video của bạn' : `Đăng bởi ${video.user.name}` }}</span>
+            <span v-if="isOwner">Video của bạn</span>
+            <span v-else>
+              Đăng bởi
+              <NuxtLink :to="channelPath(video.user.username)" class="font-medium text-fg hover:underline">{{ video.user.name }}</NuxtLink>
+            </span>
             <span aria-hidden="true">·</span>
             <time :datetime="parseServerDate(video.created_at).toISOString()" :title="formatDate(video.created_at)">
               {{ formatRelative(video.created_at) }}
@@ -138,6 +142,8 @@
         </section>
       </div>
 
+      <CommentSection :key="video.id" :video-id="video.id" :video-owner-id="video.user.id" :me-id="user?.id" />
+
       <ConfirmDialog
         :open="confirmDelete"
         title="Xóa video này?"
@@ -165,6 +171,7 @@ import {
   TrashIcon,
 } from '@heroicons/vue/24/outline'
 import { GraphqlError } from '~/utils/graphql'
+import { channelPath } from '~/utils/api'
 import type { Video, VideoStream } from '~/utils/api'
 
 const route = useRoute()

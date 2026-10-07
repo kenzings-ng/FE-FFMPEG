@@ -12,7 +12,7 @@ export function useAccount() {
     return data.me
   }
 
-  async function updateProfile(input: { name?: string; password?: string }) {
+  async function updateProfile(input: { name?: string; username?: string; bio?: string; current_password?: string; password?: string }) {
     const data = await query<{ updateProfile: User }>(UPDATE_PROFILE_MUTATION, input)
     auth.setUser(data.updateProfile)
     return data.updateProfile
