@@ -41,12 +41,42 @@
             :maxlength="NAME_MAX"
             :error="nameForm.fieldErrors.name"
           />
+          <FormTextField
+            id="username"
+            v-model.trim="username"
+            label="Tên người dùng"
+            autocomplete="username"
+            autocapitalize="none"
+            :spellcheck="false"
+            :maxlength="USERNAME_MAX + 1"
+            :hint="usernameHint"
+            :error="nameForm.fieldErrors.username ?? (usernameStatus.state === 'error' ? usernameStatus.message : undefined)"
+          >
+            <template #label-extra><span class="text-xs text-muted">Đổi tối đa 2 lần / 14 ngày</span></template>
+          </FormTextField>
+          <div>
+            <div class="flex items-baseline justify-between gap-2">
+              <label for="bio" class="label">Giới thiệu</label>
+              <span :class="['text-xs', bio.length > BIO_MAX ? 'text-danger' : 'text-muted']">{{ bio.length }}/{{ BIO_MAX }}</span>
+            </div>
+            <textarea
+              id="bio"
+              v-model="bio"
+              rows="4"
+              class="input min-h-24 w-full resize-y"
+              placeholder="Giới thiệu ngắn về bạn, hiện trên trang kênh"
+              :aria-invalid="!!nameForm.fieldErrors.bio"
+              :aria-describedby="nameForm.fieldErrors.bio ? 'bio-error' : undefined"
+            />
+            <p v-if="nameForm.fieldErrors.bio" id="bio-error" class="mt-1.5 text-sm text-danger">{{ nameForm.fieldErrors.bio }}</p>
+          </div>
           <FormAlert v-if="nameForm.formError.value">{{ nameForm.formError.value }}</FormAlert>
-          <FormAlert v-if="nameSaved" tone="success">Đã lưu tên mới.</FormAlert>
-          <div class="flex justify-end">
-            <button type="submit" class="btn-primary" :disabled="savingName || name === user.name">
+          <FormAlert v-if="nameSaved" tone="success">Đã lưu thông tin.</FormAlert>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <NuxtLink :to="channelPath(user.username)" class="text-sm font-medium text-accent hover:underline">Xem kênh của bạn</NuxtLink>
+            <button type="submit" class="btn-primary" :disabled="savingName || !profileChanged">
               <ArrowPathIcon v-if="savingName" class="h-4 w-4 animate-spin" aria-hidden="true" />
-              {{ savingName ? 'Đang lưu…' : 'Lưu tên' }}
+              {{ savingName ? 'Đang lưu…' : 'Lưu thông tin' }}
             </button>
           </div>
         </form>
@@ -57,6 +87,13 @@
         <h2 id="password-heading" class="font-semibold">Đổi mật khẩu</h2>
         <form class="mt-4 space-y-4" novalidate @submit.prevent="savePassword">
           <input type="email" name="email" autocomplete="username" :value="user.email" class="sr-only" tabindex="-1" aria-hidden="true" readonly />
+          <FormPasswordField
+            id="current_password"
+            v-model="currentPassword"
+            label="Mật khẩu hiện tại"
+            autocomplete="current-password"
+            :error="passwordForm.fieldErrors.current_password"
+          />
           <FormPasswordField
             id="password"
             v-model="password"
@@ -99,6 +136,8 @@
 
 <script setup lang="ts">
 import { ArrowPathIcon, ArrowRightStartOnRectangleIcon, CheckBadgeIcon, ExclamationCircleIcon } from '@heroicons/vue/24/outline'
+import { channelPath } from '~/utils/api'
+import { USERNAME_MAX, normalizeUsername, usernameFormatError } from '~/utils/username'
 
 useHead({ title: 'Tài khoản · FFmpeg Stream' })
 
@@ -107,17 +146,37 @@ const { user, loadUser, updateProfile, resendVerificationEmail, logout } = useAc
 // Luôn lấy `me` mới khi mở trang (vd. vừa xác thực email ở tab khác).
 onMounted(() => loadUser(true).catch(() => {}))
 
-// ---- Tên ----
+// ---- Tên hiển thị + tên người dùng ----
 const name = ref(user.value?.name ?? '')
+const username = ref(user.value?.username ?? '')
+const BIO_MAX = 1000
+const bio = ref(user.value?.bio ?? '')
+// Dữ liệu `me` mới về (lúc mở trang / sau khi lưu): chỉ cập nhật ô người dùng
+// chưa sửa, không ghi đè thứ họ đang gõ.
 watch(
-  () => user.value?.name,
-  (value) => {
-    if (value !== undefined) name.value = value
+  () => user.value,
+  (value, old) => {
+    if (!value) return
+    if (!old || name.value === old.name) name.value = value.name
+    if (!old || normalizeUsername(username.value) === old.username) username.value = value.username
+    if (!old || bio.value === (old.bio ?? '')) bio.value = value.bio ?? ''
   },
 )
+const currentUsername = computed(() => user.value?.username)
+const usernameStatus = useUsernameCheck(username, currentUsername)
+const usernameHint = computed(() =>
+  usernameStatus.value.state === 'ok'
+    ? usernameStatus.value.message
+    : usernameStatus.value.state === 'checking'
+      ? 'Đang kiểm tra…'
+      : `Người khác nhắc bạn bằng @${normalizeUsername(username.value) || '…'}`,
+)
+const usernameChanged = computed(() => normalizeUsername(username.value) !== user.value?.username)
+const bioChanged = computed(() => bio.value.trim() !== (user.value?.bio ?? ''))
+const profileChanged = computed(() => name.value !== user.value?.name || usernameChanged.value || bioChanged.value)
 const savingName = ref(false)
 const nameSaved = ref(false)
-const nameForm = useFormErrors(['name'] as const)
+const nameForm = useFormErrors(['name', 'username', 'bio'] as const)
 
 async function saveName() {
   nameForm.reset()
@@ -126,11 +185,18 @@ async function saveName() {
     'name',
     !name.value ? 'Vui lòng nhập tên.' : !SAFE_TEXT_PATTERN.test(name.value) ? 'Tên không được chứa ký tự < hoặc >.' : undefined,
   )
+  nameForm.set('username', usernameFormatError(username.value))
+  nameForm.set('bio', bio.value.length > BIO_MAX ? `Giới thiệu tối đa ${BIO_MAX} ký tự.` : undefined)
   if (nameForm.focusFirst()) return
 
   savingName.value = true
   try {
-    await updateProfile({ name: name.value })
+    await updateProfile({
+      name: name.value,
+      ...(usernameChanged.value ? { username: normalizeUsername(username.value) } : {}),
+      // Chuỗi rỗng = xóa phần giới thiệu.
+      ...(bioChanged.value ? { bio: bio.value.trim() } : {}),
+    })
     nameSaved.value = true
   } catch (error) {
     nameForm.apply(error)
@@ -140,22 +206,26 @@ async function saveName() {
 }
 
 // ---- Mật khẩu ----
+const currentPassword = ref('')
 const password = ref('')
 const confirm = ref('')
 const savingPassword = ref(false)
 const passwordSaved = ref(false)
-const passwordForm = useFormErrors(['password', 'confirm'] as const)
+const passwordForm = useFormErrors(['current_password', 'password', 'confirm'] as const)
 
 async function savePassword() {
   passwordForm.reset()
   passwordSaved.value = false
+  passwordForm.set('current_password', !currentPassword.value ? 'Vui lòng nhập mật khẩu hiện tại.' : undefined)
   passwordForm.set('password', password.value.length < PASSWORD_MIN ? `Mật khẩu cần tối thiểu ${PASSWORD_MIN} ký tự.` : undefined)
   passwordForm.set('confirm', confirm.value !== password.value ? 'Mật khẩu nhập lại không khớp.' : undefined)
   if (passwordForm.focusFirst()) return
 
   savingPassword.value = true
   try {
-    await updateProfile({ password: password.value })
+    // BE bắt buộc current_password khi đổi mật khẩu (chứng minh đúng chủ tài khoản).
+    await updateProfile({ current_password: currentPassword.value, password: password.value })
+    currentPassword.value = ''
     password.value = ''
     confirm.value = ''
     passwordSaved.value = true

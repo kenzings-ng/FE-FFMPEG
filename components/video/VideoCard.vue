@@ -49,7 +49,13 @@
         </NuxtLink>
       </h2>
       <p class="mt-1 truncate text-sm text-muted">
-        {{ isMine ? 'Video của bạn' : video.user.name }} ·
+        <template v-if="!hideChannel">
+          <!-- relative z-10: nổi trên lớp link phủ cả thẻ (after:inset-0) để bấm được riêng. -->
+          <NuxtLink :to="channelPath(video.user.username)" class="relative z-10 hover:text-fg hover:underline">{{
+            isMine ? 'Video của bạn' : video.user.name
+          }}</NuxtLink>
+          ·
+        </template>
         <time :datetime="parseServerDate(video.created_at).toISOString()">{{ formatRelative(video.created_at) }}</time>
       </p>
     </div>
@@ -58,9 +64,15 @@
 
 <script setup lang="ts">
 import { ArrowPathIcon, ClockIcon, ExclamationTriangleIcon, PlayIcon } from '@heroicons/vue/24/solid'
+import { channelPath } from '~/utils/api'
 import type { Video } from '~/utils/api'
 
-const props = defineProps<{ video: Video; currentUserId?: string }>()
+const props = defineProps<{
+  video: Video
+  currentUserId?: string
+  /** Trên trang kênh: không lặp lại tên kênh trên từng thẻ. */
+  hideChannel?: boolean
+}>()
 
 const isMine = computed(() => props.video.user.id === props.currentUserId)
 // Video chưa có ảnh bìa (đang xử lý / lỗi): gradient cố định theo id để các thẻ phân biệt được.

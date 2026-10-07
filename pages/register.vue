@@ -13,6 +13,20 @@
         :error="fieldErrors.name"
       />
       <FormTextField
+        id="username"
+        v-model.trim="username"
+        label="Tên người dùng"
+        autocomplete="username"
+        autocapitalize="none"
+        :spellcheck="false"
+        :maxlength="USERNAME_MAX + 1"
+        :hint="usernameHint"
+        :error="fieldErrors.username ?? (usernameStatus.state === 'error' ? usernameStatus.message : undefined)"
+        @input="usernameTouched = true"
+      >
+        <template #label-extra><span class="text-xs text-muted">Để người khác @nhắc bạn</span></template>
+      </FormTextField>
+      <FormTextField
         id="email"
         v-model.trim="email"
         label="Email"
@@ -52,6 +66,7 @@
 
 <script setup lang="ts">
 import { ArrowPathIcon } from '@heroicons/vue/24/outline'
+import { USERNAME_MAX, normalizeUsername, suggestUsername, usernameFormatError } from '~/utils/username'
 
 definePageMeta({ layout: 'auth' })
 useHead({ title: 'Đăng ký · FFmpeg Stream' })
@@ -60,17 +75,32 @@ const auth = useAuth()
 const route = useRoute()
 
 const name = ref('')
+const username = ref('')
+/** Chưa tự sửa thì handle đi theo tên đang gõ. */
+const usernameTouched = ref(false)
+watch(name, (value) => {
+  if (!usernameTouched.value) username.value = suggestUsername(value)
+})
+const usernameStatus = useUsernameCheck(username)
+const usernameHint = computed(() =>
+  usernameStatus.value.state === 'ok'
+    ? usernameStatus.value.message
+    : usernameStatus.value.state === 'checking'
+      ? 'Đang kiểm tra…'
+      : 'Chữ thường không dấu, số, . và _. Bỏ trống để tự tạo.',
+)
 const email = ref('')
 const password = ref('')
 const remember = ref(false)
 const loading = ref(false)
-const { fieldErrors, formError, reset, set, focusFirst, apply } = useFormErrors(['name', 'email', 'password'] as const)
+const { fieldErrors, formError, reset, set, focusFirst, apply } = useFormErrors(['name', 'username', 'email', 'password'] as const)
 
 function validate() {
   set(
     'name',
     !name.value ? 'Vui lòng nhập tên.' : !SAFE_TEXT_PATTERN.test(name.value) ? 'Tên không được chứa ký tự < hoặc >.' : undefined,
   )
+  set('username', username.value ? usernameFormatError(username.value) : undefined)
   set('email', !email.value ? 'Vui lòng nhập email.' : !EMAIL_PATTERN.test(email.value) ? 'Email không hợp lệ.' : undefined)
   set('password', password.value.length < PASSWORD_MIN ? `Mật khẩu cần tối thiểu ${PASSWORD_MIN} ký tự.` : undefined)
   return !focusFirst()
@@ -83,7 +113,7 @@ async function submit() {
   loading.value = true
   try {
     // BE tự đăng nhập sau khi tạo và gửi email xác thực (không bắt buộc xác thực mới dùng được).
-    await auth.register(name.value, email.value, password.value, remember.value)
+    await auth.register(name.value, normalizeUsername(username.value), email.value, password.value, remember.value)
     await navigateTo(safeRedirect(route.query.redirect))
   } catch (error) {
     apply(error)

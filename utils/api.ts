@@ -3,6 +3,10 @@
 export interface User {
   id: string
   name: string
+  /** Handle duy nhất, không có '@'. */
+  username: string
+  /** Phần giới thiệu trên trang kênh. */
+  bio: string | null
   email: string
   /** null khi chưa xác thực email. */
   email_verified_at: string | null
@@ -26,7 +30,14 @@ export interface Video {
   /** Chỉ có trong VIDEO_QUERY, và chỉ với video READY trên CDN (R2). */
   stream?: VideoStream | null
   created_at: string
-  user: { id: string; name: string }
+  user: UserRef
+}
+
+/** Người dùng rút gọn hiển thị kèm nội dung (video, bình luận). */
+export interface UserRef {
+  id: string
+  name: string
+  username: string
 }
 
 /** Quyền phát video trên CDN: đổi `grant` lấy stream token tại `token_url`. */
@@ -45,7 +56,7 @@ export interface PaginatorInfo {
   hasMorePages: boolean
 }
 
-const USER_FIELDS = 'id name email email_verified_at created_at'
+const USER_FIELDS = 'id name username bio email email_verified_at created_at'
 
 const VIDEO_FIELDS = `
   id
@@ -55,7 +66,7 @@ const VIDEO_FIELDS = `
   hls_url
   poster_url
   created_at
-  user { id name }
+  user { id name username }
 `
 
 // ---- User / auth (cần đăng nhập) ----
@@ -73,8 +84,15 @@ export const LOGOUT_MUTATION = `
 `
 
 export const UPDATE_PROFILE_MUTATION = `
-  mutation UpdateProfile($name: String, $password: String) {
-    updateProfile(name: $name, password: $password) { ${USER_FIELDS} }
+  mutation UpdateProfile($name: String, $username: String, $bio: String, $current_password: String, $password: String) {
+    updateProfile(name: $name, username: $username, bio: $bio, current_password: $current_password, password: $password) { ${USER_FIELDS} }
+  }
+`
+
+/** Kiểm tra handle khi đang gõ (không cần đăng nhập). */
+export const USERNAME_AVAILABLE_QUERY = `
+  query UsernameAvailable($username: String!) {
+    usernameAvailable(username: $username) { username available message }
   }
 `
 
@@ -154,6 +172,132 @@ export const DELETE_VIDEO_MUTATION = `
   }
 `
 
+// ---- Trang kênh /@handle ----
+
+export interface Channel extends UserRef {
+  bio: string | null
+  /** Số video công khai đã xử lý xong. */
+  videos_count: number
+  created_at: string
+}
+
+/** Thông tin kênh (handle cũ vừa đổi vẫn trả về đúng người: so channel.username để chuyển URL). */
+export const CHANNEL_QUERY = `
+  query Channel($username: String!) {
+    userByUsername(username: $username) { id name username bio videos_count created_at }
+  }
+`
+
+/** Tab Video của kênh: chỉ video công khai đã xử lý xong, mới nhất trước. */
+export const CHANNEL_VIDEOS_QUERY = `
+  query ChannelVideos($username: String!, $first: Int!, $page: Int) {
+    userByUsername(username: $username) {
+      id
+      videos(first: $first, page: $page) {
+        data { ${VIDEO_FIELDS} }
+        paginatorInfo { currentPage hasMorePages total }
+      }
+    }
+  }
+`
+
+/** Link tới trang kênh. */
+export function channelPath(username: string): string {
+  return `/@${username}`
+}
+
+// ---- Bình luận (graphql/comment/comment.graphql) ----
+
+export interface Comment {
+  id: string
+  /** Text thuần: luôn hiển thị bằng interpolation, KHÔNG dùng v-html. */
+  body: string
+  user: UserRef
+  /** Người được trả lời (khi trả lời một trả lời). Nội dung đã có sẵn "@handle" của họ. */
+  reply_to_user: UserRef | null
+  /**
+   * Lần nhắc tên có thật: `handle` là chữ lúc viết (trong body), `user` là người
+   * được nhắc với handle hiện tại. Hiển thị luôn dùng handle hiện tại.
+   */
+  mentions: { handle: string; user: UserRef }[]
+  /** null = bình luận gốc. */
+  parent_id: string | null
+  replies_count: number
+  edited_at: string | null
+  created_at: string
+}
+
+export interface Page<T> {
+  data: T[]
+  paginatorInfo: { currentPage: number; hasMorePages: boolean; total: number }
+}
+
+export const COMMENT_PAGE_SIZE = 20
+
+const COMMENT_FIELDS = `
+  id
+  body
+  user { id name username }
+  reply_to_user { id name username }
+  mentions { handle user { id name username } }
+  parent_id
+  replies_count
+  edited_at
+  created_at
+`
+
+/** Bình luận gốc của video, mới nhất trước. */
+export const VIDEO_COMMENTS_QUERY = `
+  query VideoComments($id: ID!, $first: Int!, $page: Int) {
+    video(id: $id) {
+      id
+      comments_count
+      comments(first: $first, page: $page) {
+        data { ${COMMENT_FIELDS} }
+        paginatorInfo { currentPage hasMorePages total }
+      }
+    }
+  }
+`
+
+/** Trả lời của một bình luận gốc, cũ nhất trước. */
+export const COMMENT_REPLIES_QUERY = `
+  query CommentReplies($id: ID!, $first: Int!, $page: Int) {
+    comment(id: $id) {
+      id
+      replies(first: $first, page: $page) {
+        data { ${COMMENT_FIELDS} }
+        paginatorInfo { currentPage hasMorePages total }
+      }
+    }
+  }
+`
+
+export const CREATE_COMMENT_MUTATION = `
+  mutation CreateComment($video_id: ID!, $body: String!, $reply_to_id: ID) {
+    createComment(video_id: $video_id, body: $body, reply_to_id: $reply_to_id) { ${COMMENT_FIELDS} }
+  }
+`
+
+export const UPDATE_COMMENT_MUTATION = `
+  mutation UpdateComment($id: ID!, $body: String!) {
+    updateComment(id: $id, body: $body) { ${COMMENT_FIELDS} }
+  }
+`
+
+/** Gợi ý khi gõ "@" trong bình luận của video. */
+export const MENTION_SUGGESTIONS_QUERY = `
+  query MentionSuggestions($video_id: ID!, $query: String) {
+    mentionSuggestions(video_id: $video_id, query: $query) { id name username }
+  }
+`
+
+export const DELETE_COMMENT_MUTATION = `
+  mutation DeleteComment($id: ID!) {
+    deleteComment(id: $id)
+  }
+`
+
 // ---- Rule khớp với BE ----
 
 /** name/title: không chứa < hoặc >, tối đa 255 ký tự. */
@@ -162,6 +306,8 @@ export const TITLE_PATTERN = SAFE_TEXT_PATTERN
 export const TITLE_MAX = 255
 export const NAME_MAX = 255
 export const PASSWORD_MIN = 8
+/** BE: comment body max:2000. */
+export const COMMENT_MAX = 2000
 /** BE: max:2097152 (KB) = 2 GB. */
 export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024
 export const EMAIL_PATTERN = /^\S+@\S+\.\S+$/

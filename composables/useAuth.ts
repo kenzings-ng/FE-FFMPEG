@@ -37,8 +37,8 @@ const LOGIN_MUTATION = `
 `
 
 const REGISTER_MUTATION = `
-  mutation Register($name: String!, $email: String!, $password: String!, $remember_me: Boolean) {
-    register(name: $name, email: $email, password: $password, remember_me: $remember_me) { ${AUTH_FIELDS} }
+  mutation Register($name: String!, $username: String, $email: String!, $password: String!, $remember_me: Boolean) {
+    register(name: $name, username: $username, email: $email, password: $password, remember_me: $remember_me) { ${AUTH_FIELDS} }
   }
 `
 
@@ -126,8 +126,9 @@ export function useAuth() {
   }
 
   /** Đăng ký xong BE trả token luôn (đã đăng nhập). Lỗi validate từng field nằm trong GraphqlError. */
-  async function register(name: string, email: string, password: string, remember: boolean) {
-    await requestToken('register', REGISTER_MUTATION, { name, email, password, remember_me: remember }, remember)
+  /** username rỗng: BE tự sinh từ tên. */
+  async function register(name: string, username: string, email: string, password: string, remember: boolean) {
+    await requestToken('register', REGISTER_MUTATION, { name, username: username || null, email, password, remember_me: remember }, remember)
   }
 
   async function refresh() {

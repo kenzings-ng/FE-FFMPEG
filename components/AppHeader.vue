@@ -52,9 +52,20 @@
             >
               <div class="px-3 py-2">
                 <p class="truncate text-sm font-semibold">{{ user.name }}</p>
+                <p v-if="user.username" class="truncate text-xs text-muted">@{{ user.username }}</p>
                 <p class="truncate text-xs text-muted">{{ user.email }}</p>
               </div>
               <div class="my-1 h-px bg-line" />
+              <MenuItem v-if="user.username" v-slot="{ active, close }">
+                <NuxtLink
+                  :to="channelPath(user.username)"
+                  :class="[active ? 'bg-surface-2' : '', 'flex items-center gap-2 rounded-lg px-3 py-2 text-sm']"
+                  @click="close"
+                >
+                  <PlayCircleIcon class="h-4 w-4" aria-hidden="true" />
+                  Kênh của bạn
+                </NuxtLink>
+              </MenuItem>
               <MenuItem v-slot="{ active, close }">
                 <NuxtLink
                   to="/profile"
@@ -91,9 +102,11 @@ import {
   ArrowUpTrayIcon,
   ChevronDownIcon,
   MoonIcon,
+  PlayCircleIcon,
   SunIcon,
   UserCircleIcon,
 } from '@heroicons/vue/24/outline'
+import { channelPath } from '~/utils/api'
 
 const colorMode = useColorMode()
 const { user, logout } = useAccount()
