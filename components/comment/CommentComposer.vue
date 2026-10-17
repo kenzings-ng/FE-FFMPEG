@@ -162,12 +162,12 @@ function closeMenu() {
   active.value = -1
 }
 
-/** Thay "@đang-gõ" bằng "@handle " và đặt con trỏ ngay sau. */
+/** Thay "@đang-gõ" bằng "@Tên " và đặt con trỏ ngay sau (giống Facebook). */
 function pick(user: UserRef) {
   const el = textarea.value
   if (!el || !mention.value) return
   const caret = el.selectionStart
-  const insert = `@${user.username} `
+  const insert = `@${user.name} `
   text.value = text.value.slice(0, mention.value.start) + insert + text.value.slice(caret)
   const position = mention.value.start + insert.length
   closeMenu()

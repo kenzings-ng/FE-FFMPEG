@@ -41,41 +41,89 @@ const MENTION = /(^|[^A-Za-z0-9._@])@([A-Za-z0-9](?:[A-Za-z0-9._]*[A-Za-z0-9])?)
 
 export interface TextSegment {
   text: string
-  /** Người được nhắc nếu đoạn này là một lần nhắc tên (text đã là "@handle hiện tại"). */
+  /** Người được nhắc nếu đoạn này là một lần nhắc tên (text là "@Tên người dùng" hoặc "@handle"). */
   user?: UserRef
 }
 
 /**
- * Tách nội dung bình luận thành đoạn chữ và đoạn nhắc tên. `mentions` (từ BE)
- * map chữ "@handle" lúc viết sang người được nhắc; đoạn nhắc tên hiển thị handle
- * HIỆN TẠI của người đó, nên họ đổi handle thì bình luận cũ vẫn đúng người.
+ * Tách nội dung bình luận thành đoạn chữ và đoạn nhắc tên. Hỗ trợ cả @handle
+ * lẫn @Tên người dùng (kiểu Facebook).
  */
 export function splitMentions(text: string, mentions: { handle: string; user: UserRef }[]): TextSegment[] {
-  const byHandle = new Map(mentions.map((m) => [m.handle.toLowerCase(), m.user]))
+  if (!mentions || !mentions.length || !text) return [{ text: text || '' }]
+
+  // Tạo danh sách các chuỗi nhắc tên cần tìm kiếm, ưu tiên chuỗi dài nhất trước
+  const targets: { search: string; user: UserRef }[] = []
+  for (const m of mentions) {
+    if (m.handle) targets.push({ search: `@${m.handle}`, user: m.user })
+    if (m.user?.name && m.user.name !== m.handle) targets.push({ search: `@${m.user.name}`, user: m.user })
+    if (m.user?.username && m.user.username !== m.handle) targets.push({ search: `@${m.user.username}`, user: m.user })
+  }
+  targets.sort((a, b) => b.search.length - a.search.length)
+
+  // Tìm tất cả các vị trí xuất hiện không đè lên nhau
+  const matches: { start: number; end: number; displayText: string; user: UserRef }[] = []
+  const lowerText = text.toLowerCase()
+
+  for (const target of targets) {
+    const searchLower = target.search.toLowerCase()
+    let pos = 0
+    while ((pos = lowerText.indexOf(searchLower, pos)) !== -1) {
+      const end = pos + target.search.length
+      // Kiểm tra xem vị trí này đã bị match trước đó chưa (overlap)
+      const overlaps = matches.some((m) => Math.max(m.start, pos) < Math.min(m.end, end))
+      if (!overlaps) {
+        // Ký tự liền trước '@' phải là đầu chuỗi hoặc khoảng trắng/dấu mở ngoặc
+        const validStart = pos === 0 || /[\s(]/.test(text[pos - 1])
+        // Ký tự liền sau phải là hết chuỗi hoặc khoảng trắng/dấu câu
+        const validEnd = end === text.length || /[\s,;:!?.)<>]/.test(text[end])
+        if (validStart && validEnd) {
+          matches.push({
+            start: pos,
+            end,
+            displayText: text.slice(pos, end),
+            user: target.user,
+          })
+        }
+      }
+      pos = end
+    }
+  }
+
+  if (!matches.length) return [{ text }]
+
+  matches.sort((a, b) => a.start - b.start)
+
   const segments: TextSegment[] = []
   let last = 0
-  for (const match of text.matchAll(MENTION)) {
-    const user = byHandle.get(match[2].toLowerCase())
-    if (!user) continue
-    const start = match.index! + match[1].length
-    if (start > last) segments.push({ text: text.slice(last, start) })
-    segments.push({ text: `@${user.username}`, user })
-    last = start + 1 + match[2].length
+  for (const m of matches) {
+    if (m.start > last) {
+      segments.push({ text: text.slice(last, m.start) })
+    }
+    segments.push({ text: m.displayText, user: m.user })
+    last = m.end
   }
-  if (last < text.length) segments.push({ text: text.slice(last) })
+  if (last < text.length) {
+    segments.push({ text: text.slice(last) })
+  }
+
   return segments
 }
 
-/** Nội dung với mọi lần nhắc tên đổi sang handle hiện tại (dùng khi mở ô sửa). */
-export function withCurrentHandles(text: string, mentions: { handle: string; user: UserRef }[]): string {
-  return splitMentions(text, mentions)
-    .map((segment) => segment.text)
-    .join('')
+/** Nội dung khi mở ô sửa: giữ nguyên nội dung gốc để người dùng sửa. */
+export function withCurrentHandles(text: string, _mentions: { handle: string; user: UserRef }[]): string {
+  return text
 }
 
-/** "@…" đang gõ ngay trước con trỏ (để mở gợi ý), hoặc null. */
+/** "@…" đang gõ ngay trước con trỏ (hỗ trợ cả tiếng Việt có dấu, khoảng trắng trong tên), hoặc null. */
 export function activeMention(text: string, caret: number): { start: number; query: string } | null {
-  const match = /(^|[^A-Za-z0-9._@])@([A-Za-z0-9._]{0,30})$/.exec(text.slice(0, caret))
-  if (!match) return null
-  return { start: caret - match[2].length - 1, query: match[2] }
+  const beforeCaret = text.slice(0, caret)
+  const atIndex = beforeCaret.lastIndexOf('@')
+  if (atIndex === -1) return null
+  // Ký tự liền trước '@' phải là đầu dòng, khoảng trắng hoặc dấu mở ngoặc
+  if (atIndex > 0 && !/[\s(]/.test(beforeCaret[atIndex - 1])) return null
+  const query = beforeCaret.slice(atIndex + 1)
+  // Không cho chứa xuống dòng, ký tự ngắt câu hoặc quá 35 ký tự
+  if (/[\n\r\t.,!?;:<>]/.test(query) || query.length > 35) return null
+  return { start: atIndex, query }
 }

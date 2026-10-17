@@ -15,7 +15,7 @@
         :key="replyTo.id"
         class="mt-3"
         :label="`Trả lời ${replyTo.user.name}`"
-        :placeholder="`Trả lời @${replyTo.user.username}…`"
+        :placeholder="`Trả lời ${replyTo.user.name}…`"
         submit-label="Phản hồi"
         :initial="replyPrefill"
         :video-id="videoId"
@@ -84,11 +84,11 @@ const showReplies = ref(false)
 
 const replyTo = ref<Comment | null>(null)
 /**
- * Trả lời một trả lời: điền sẵn "@handle " của người đó (như YouTube), vì mọi
+ * Trả lời một trả lời: điền sẵn "@Tên " của người đó (như Facebook), vì mọi
  * trả lời nằm chung một luồng. Trả lời bình luận gốc hoặc chính mình thì không cần.
  */
 const replyPrefill = computed(() =>
-  replyTo.value?.parent_id && replyTo.value.user.id !== props.meId ? `@${replyTo.value.user.username} ` : '',
+  replyTo.value?.parent_id && replyTo.value.user.id !== props.meId ? `@${replyTo.value.user.name} ` : '',
 )
 const sending = ref(false)
 const sendError = ref('')
